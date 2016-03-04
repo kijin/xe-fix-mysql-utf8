@@ -19,11 +19,17 @@ if (!defined('__XE__')) exit();
  */
 if ($called_position === 'before_module_init' && preg_match('/^proc.+(Insert|Send)/', Context::get('act')))
 {
+	/**
+	 * This is the main function for encoding a string.
+	 */
 	function utf8mb4_encode_main($str)
 	{
 		return preg_replace_callback('/[\xF0-\xF7][\x80-\xBF]{3}/', 'utf8mb4_encode_callback', $str);
 	}
 	
+	/**
+	 * This is the callback function for preg_replace_callback().
+	 */
 	function utf8mb4_encode_callback($matches)
 	{
 		$bytes = array(ord($matches[0][0]), ord($matches[0][1]), ord($matches[0][2]), ord($matches[0][3]));
@@ -31,8 +37,14 @@ if ($called_position === 'before_module_init' && preg_match('/^proc.+(Insert|Sen
 		return '&#x' . dechex($codepoint) . ';';
 	}
 	
+	/**
+	 * This flag keeps track of whether any conversion took place.
+	 */
 	$utf8mb4_converted = false;
 	
+	/**
+	 * Convert the title.
+	 */
 	if ($title = Context::get('title'))
 	{
 		Context::set('title', $new_title = utf8mb4_encode_main($title), true);
@@ -42,6 +54,9 @@ if ($called_position === 'before_module_init' && preg_match('/^proc.+(Insert|Sen
 		}
 	}
 	
+	/**
+	 * Convert the content.
+	 */
 	if ($content = Context::get('content'))
 	{
 		Context::set('content', $new_content = utf8mb4_encode_main($content), true);
@@ -51,7 +66,10 @@ if ($called_position === 'before_module_init' && preg_match('/^proc.+(Insert|Sen
 		}
 	}
 	
-	if ($utf8mb4_converted && FileHandler::exists(_XE_PATH_ . 'classes/security/htmlpurifier/library/HTMLPurifier.php'))
+	/**
+	 * If conversion took place, monkey-patch HTMLPurifier to prevent it from destroying our HTML entities.
+	 */
+	if ($utf8mb4_converted && !class_exists('HTMLPurifier', false) && FileHandler::exists(_XE_PATH_ . 'classes/security/htmlpurifier/library/HTMLPurifier.php'))
 	{
 		$hp_source = FileHandler::readFile(_XE_PATH_ . 'classes/security/htmlpurifier/library/HTMLPurifier.php');
 		$hp_source = str_replace('return $html;', 'return utf8mb4_encode_main($html);', $hp_source);
