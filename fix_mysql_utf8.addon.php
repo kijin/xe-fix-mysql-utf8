@@ -17,7 +17,7 @@ if (!defined('__XE__')) exit();
 /**
  * Encode the title and content of all submissions.
  */
-if ($called_position === 'before_module_proc' && preg_match('/^proc.+(Insert|Send)/', $this->act))
+if ($called_position === 'before_module_init' && preg_match('/^proc.+(Insert|Send)/', Context::get('act')))
 {
 	function utf8mb4_encode_main($str)
 	{
@@ -31,13 +31,31 @@ if ($called_position === 'before_module_proc' && preg_match('/^proc.+(Insert|Sen
 		return '&#x' . dechex($codepoint) . ';';
 	}
 	
+	$utf8mb4_converted = false;
+	
 	if ($title = Context::get('title'))
 	{
-		Context::set('title', utf8mb4_encode_main($title), true);
+		Context::set('title', $new_title = utf8mb4_encode_main($title), true);
+		if ($title !== $new_title)
+		{
+			$utf8mb4_converted = true;
+		}
 	}
 	
 	if ($content = Context::get('content'))
 	{
-		Context::set('content', utf8mb4_encode_main($content), true);
+		Context::set('content', $new_content = utf8mb4_encode_main($content), true);
+		if ($content !== $new_content)
+		{
+			$utf8mb4_converted = true;
+		}
+	}
+	
+	if ($utf8mb4_converted && FileHandler::exists(_XE_PATH_ . 'classes/security/htmlpurifier/library/HTMLPurifier.php'))
+	{
+		$hp_source = FileHandler::readFile(_XE_PATH_ . 'classes/security/htmlpurifier/library/HTMLPurifier.php');
+		$hp_source = str_replace('return $html;', 'return utf8mb4_encode_main($html);', $hp_source);
+		FileHandler::writeFile(_XE_PATH_ . 'files/cache/htmlpurifier/fix_mysql_utf8.patch.php', $hp_source);
+		include _XE_PATH_ . 'files/cache/htmlpurifier/fix_mysql_utf8.patch.php';
 	}
 }
